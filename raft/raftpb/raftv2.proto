@@ -1,0 +1,40 @@
+syntax = "proto2";
+package raftpb;
+
+import "raft.proto";
+import "gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.goproto_getters_all) = false;
+option (gogoproto.goproto_enum_prefix_all) = false;
+
+message ConfStateV2 {
+	repeated uint64 nodes    = 1;
+	repeated uint64 learners = 2;
+    optional ConfState joint = 3;
+}
+
+message SnapshotMetadataV2 {
+	optional ConfStateV2 conf_state = 1 [(gogoproto.nullable) = false];
+	optional uint64      index      = 2 [(gogoproto.nullable) = false];
+	optional uint64      term       = 3 [(gogoproto.nullable) = false];
+}
+
+message SnapshotV2 {
+	optional bytes              data     = 1;
+	optional SnapshotMetadataV2 metadata = 2 [(gogoproto.nullable) = false];
+}
+
+message HardStateV2 {
+	optional uint64 term           = 1 [(gogoproto.nullable) = false];
+	optional uint64 vote           = 2 [(gogoproto.nullable) = false];
+	optional uint64 commit         = 3 [(gogoproto.nullable) = false];
+	optional uint64 max_conf_index = 4 [(gogoproto.nullable) = false];
+}
+
+message ConfChangeV2 {
+    optional ConfStateV2 conf_state = 1 [(gogoproto.nullable) = false];
+	optional bytes       context    = 2;
+}
