@@ -142,6 +142,11 @@ type Config struct {
 	// Storage when it needs. raft reads out the previous state and configuration
 	// out of storage when restarting.
 	Storage Storage
+	// TODO(tbg): add a comment. Cannot specify both Storage and StorageV2. If
+	// Storage is specified, cannot use the V2-suffixed methods. If StorageV2 is
+	// specified, can only use the V2-suffixed variants of methods. Also, after
+	// having opted into V2 once, cannot leave it again.
+	StorageV2 StorageV2
 	// Applied is the last applied index. It should only be set when restarting
 	// raft. raft will not return entries to the application smaller or equal to
 	// Applied. If Applied is unset when restarting, raft might return previous
@@ -219,8 +224,8 @@ func (c *Config) validate() error {
 		return errors.New("election tick must be greater than heartbeat tick")
 	}
 
-	if c.Storage == nil {
-		return errors.New("storage cannot be nil")
+	if (c.Storage == nil) == (c.StorageV2 == nil) {
+		return errors.New("exactly one of Storage and StorageV2 must be non-nil")
 	}
 
 	if c.MaxUncommittedEntriesSize == 0 {
@@ -325,11 +330,20 @@ func newRaft(c *Config) *raft {
 	if err := c.validate(); err != nil {
 		panic(err.Error())
 	}
-	raftlog := newLogWithSize(c.Storage, c.Logger, c.MaxCommittedSizePerReady)
+
+	storage := c.StorageV2
+	if storage == nil {
+		storage = &compatStorage{c.Storage}
+	}
+
+	raftlog := newLogWithSize(storage, c.Logger, c.MaxCommittedSizePerReady)
 	hs, cs, err := c.Storage.InitialState()
 	if err != nil {
 		panic(err) // TODO(bdarnell)
 	}
+	// TODO(tbg): discover replication configuration (only necessary when v2
+	// conf changes may have been carried out, but simpler to blindly do).
+
 	peers := c.peers
 	learners := c.learners
 	if len(cs.Nodes) > 0 || len(cs.Learners) > 0 {

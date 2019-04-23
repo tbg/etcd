@@ -23,7 +23,7 @@ import (
 
 type raftLog struct {
 	// storage contains all stable entries since the last snapshot.
-	storage Storage
+	storage StorageV2
 
 	// unstable contains all unstable entries and snapshot.
 	// they will be saved into storage.
@@ -47,13 +47,13 @@ type raftLog struct {
 // newLog returns log using the given storage and default options. It
 // recovers the log to the state that it just commits and applies the
 // latest snapshot.
-func newLog(storage Storage, logger Logger) *raftLog {
+func newLog(storage StorageV2, logger Logger) *raftLog {
 	return newLogWithSize(storage, logger, noLimit)
 }
 
 // newLogWithSize returns a log using the given storage and max
 // message size.
-func newLogWithSize(storage Storage, logger Logger, maxNextEntsSize uint64) *raftLog {
+func newLogWithSize(storage StorageV2, logger Logger, maxNextEntsSize uint64) *raftLog {
 	if storage == nil {
 		log.Panic("storage must not be nil")
 	}
@@ -171,7 +171,15 @@ func (l *raftLog) snapshot() (pb.Snapshot, error) {
 	if l.unstable.snapshot != nil {
 		return *l.unstable.snapshot, nil
 	}
-	return l.storage.Snapshot()
+	snap, err := l.storage.Snapshot()
+	if err != nil {
+		return pb.Snapshot{}, err
+	}
+	snapV1, ok := snap.V1()
+	if !ok {
+		l.logger.Panicf("unable to downgrade V2 snapshot to V1: %+v", snap)
+	}
+	return snapV1, nil
 }
 
 func (l *raftLog) firstIndex() uint64 {

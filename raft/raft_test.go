@@ -1014,8 +1014,10 @@ func TestDuelingCandidates(t *testing.T) {
 	// 3 will be follower again since both 1 and 2 rejects its vote request since 3 does not have a long enough log
 	nt.send(pb.Message{From: 3, To: 3, Type: pb.MsgHup})
 
+	s := NewMemoryStorageV2()
+	s.actual.ents = []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}}
 	wlog := &raftLog{
-		storage:   &MemoryStorage{ents: []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}}},
+		storage:   s,
 		committed: 1,
 		unstable:  unstable{offset: 2},
 	}
@@ -1027,7 +1029,7 @@ func TestDuelingCandidates(t *testing.T) {
 	}{
 		{a, StateFollower, 2, wlog},
 		{b, StateFollower, 2, wlog},
-		{c, StateFollower, 2, newLog(NewMemoryStorage(), raftLogger)},
+		{c, StateFollower, 2, newLog(NewMemoryStorageV2(), raftLogger)},
 	}
 
 	for i, tt := range tests {
@@ -1084,8 +1086,10 @@ func TestDuelingPreCandidates(t *testing.T) {
 	// With PreVote, it does not disrupt the leader.
 	nt.send(pb.Message{From: 3, To: 3, Type: pb.MsgHup})
 
+	s := NewMemoryStorageV2()
+	s.actual.ents = []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}}
 	wlog := &raftLog{
-		storage:   &MemoryStorage{ents: []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}}},
+		storage:   s,
 		committed: 1,
 		unstable:  unstable{offset: 2},
 	}
@@ -1097,7 +1101,7 @@ func TestDuelingPreCandidates(t *testing.T) {
 	}{
 		{a, StateLeader, 1, wlog},
 		{b, StateFollower, 1, wlog},
-		{c, StateFollower, 1, newLog(NewMemoryStorage(), raftLogger)},
+		{c, StateFollower, 1, newLog(NewMemoryStorageV2(), raftLogger)},
 	}
 
 	for i, tt := range tests {
@@ -1144,10 +1148,10 @@ func TestCandidateConcede(t *testing.T) {
 	if g := a.Term; g != 1 {
 		t.Errorf("term = %d, want %d", g, 1)
 	}
+	s := NewMemoryStorageV2()
+	s.actual.ents = []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Index: 2, Data: data}}
 	wantLog := ltoa(&raftLog{
-		storage: &MemoryStorage{
-			ents: []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Index: 2, Data: data}},
-		},
+		storage:   s,
 		unstable:  unstable{offset: 3},
 		committed: 2,
 	})
@@ -1194,14 +1198,14 @@ func TestOldMessages(t *testing.T) {
 	// commit a new entry
 	tt.send(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
 
+	s := NewMemoryStorageV2()
+	s.actual.ents = []pb.Entry{
+		{}, {Data: nil, Term: 1, Index: 1},
+		{Data: nil, Term: 2, Index: 2}, {Data: nil, Term: 3, Index: 3},
+		{Data: []byte("somedata"), Term: 3, Index: 4},
+	}
 	ilog := &raftLog{
-		storage: &MemoryStorage{
-			ents: []pb.Entry{
-				{}, {Data: nil, Term: 1, Index: 1},
-				{Data: nil, Term: 2, Index: 2}, {Data: nil, Term: 3, Index: 3},
-				{Data: []byte("somedata"), Term: 3, Index: 4},
-			},
-		},
+		storage:   s,
 		unstable:  unstable{offset: 5},
 		committed: 4,
 	}
@@ -1252,14 +1256,15 @@ func TestProposal(t *testing.T) {
 		send(pb.Message{From: 1, To: 1, Type: pb.MsgHup})
 		send(pb.Message{From: 1, To: 1, Type: pb.MsgProp, Entries: []pb.Entry{{Data: data}}})
 
-		wantLog := newLog(NewMemoryStorage(), raftLogger)
+		wantLog := newLog(NewMemoryStorageV2(), raftLogger)
 		if tt.success {
-			wantLog = &raftLog{
-				storage: &MemoryStorage{
-					ents: []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Index: 2, Data: data}},
-				},
-				unstable:  unstable{offset: 3},
-				committed: 2}
+			s := NewMemoryStorageV2()
+			s.actual.ents = []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Index: 2, Data: data}}
+			wantLog =
+				&raftLog{
+					storage:   s,
+					unstable:  unstable{offset: 3},
+					committed: 2}
 		}
 		base := ltoa(wantLog)
 		for i, p := range tt.peers {
@@ -1293,10 +1298,10 @@ func TestProposalByProxy(t *testing.T) {
 		// propose via follower
 		tt.send(pb.Message{From: 2, To: 2, Type: pb.MsgProp, Entries: []pb.Entry{{Data: []byte("somedata")}}})
 
+		s := NewMemoryStorageV2()
+		s.actual.ents = []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Data: data, Index: 2}}
 		wantLog := &raftLog{
-			storage: &MemoryStorage{
-				ents: []pb.Entry{{}, {Data: nil, Term: 1, Index: 1}, {Term: 1, Data: data, Index: 2}},
-			},
+			storage:   s,
 			unstable:  unstable{offset: 3},
 			committed: 2}
 		base := ltoa(wantLog)
@@ -1714,8 +1719,10 @@ func testRecvMsgVote(t *testing.T, msgType pb.MessageType) {
 			sm.step = stepLeader
 		}
 		sm.Vote = tt.voteFor
+		s := NewMemoryStorageV2()
+		s.actual.ents = []pb.Entry{{}, {Index: 1, Term: 2}, {Index: 2, Term: 2}}
 		sm.raftLog = &raftLog{
-			storage:  &MemoryStorage{ents: []pb.Entry{{}, {Index: 1, Term: 2}, {Index: 2, Term: 2}}},
+			storage:  s,
 			unstable: unstable{offset: 3},
 		}
 
@@ -2622,8 +2629,10 @@ func TestLeaderAppResp(t *testing.T) {
 		// sm term is 1 after it becomes the leader.
 		// thus the last log term must be 1 to be committed.
 		sm := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
+		s := NewMemoryStorageV2()
+		s.actual.ents = []pb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}
 		sm.raftLog = &raftLog{
-			storage:  &MemoryStorage{ents: []pb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}},
+			storage:  s,
 			unstable: unstable{offset: 3},
 		}
 		sm.becomeCandidate()
@@ -2729,7 +2738,9 @@ func TestRecvMsgBeat(t *testing.T) {
 
 	for i, tt := range tests {
 		sm := newTestRaft(1, []uint64{1, 2, 3}, 10, 1, NewMemoryStorage())
-		sm.raftLog = &raftLog{storage: &MemoryStorage{ents: []pb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}}}
+		s := NewMemoryStorageV2()
+		s.actual.ents = []pb.Entry{{}, {Index: 1, Term: 0}, {Index: 2, Term: 1}}
+		sm.raftLog = &raftLog{storage: s}
 		sm.Term = 1
 		sm.state = tt.state
 		switch tt.state {
