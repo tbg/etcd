@@ -998,7 +998,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			// This would allow multiple reads to piggyback on the same message.
 			switch r.readOnly.option {
 			case ReadOnlySafe:
-				r.readOnly.addRequest(r.raftLog.committed, m)
+				r.readOnly.addRequest(r.raftLog.committed, m, r.prs.makeQuorumHelper())
 				// The local node automatically acks the request.
 				r.readOnly.recvAck(r.id, m.Entries[0].Data)
 				r.bcastHeartbeatWithCtx(m.Entries[0].Data)
@@ -1098,7 +1098,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			return nil
 		}
 
-		if !r.prs.hasQuorum(r.readOnly.recvAck(m.From, m.Context)) {
+		if r.readOnly.recvAck(m.From, m.Context) != electionWon {
 			return nil
 		}
 

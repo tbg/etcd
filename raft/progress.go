@@ -294,7 +294,7 @@ type prs struct {
 	nodes    map[uint64]*Progress
 	learners map[uint64]*Progress
 
-	votes map[uint64]bool
+	votes quorumHelper
 
 	maxInflight int
 	matchBuf    uint64Slice
@@ -305,7 +305,6 @@ func makePRS(maxInflight int) prs {
 		maxInflight: maxInflight,
 		nodes:       map[uint64]*Progress{},
 		learners:    map[uint64]*Progress{},
-		votes:       map[uint64]bool{},
 	}
 	return p
 }
@@ -316,12 +315,89 @@ func (p *prs) isSingleton() bool {
 	return len(p.nodes) == 1
 }
 
-func (p *prs) quorum() int {
-	return len(p.nodes)/2 + 1
+type quorumHelper struct {
+	seen  []uint64
+	insts []vote
 }
 
-func (p *prs) hasQuorum(m map[uint64]struct{}) bool {
-	return len(m) >= p.quorum()
+func (qh *quorumHelper) voted(id uint64) bool {
+	for _, iid := range qh.seen {
+		if iid == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (qh *quorumHelper) record(id uint64, ack bool) {
+	if qh.voted(id) {
+		return
+	}
+	qh.seen = append(qh.seen, id)
+
+	for i := range qh.insts {
+		if !qh.insts[i].canVote(id) {
+			continue
+		}
+		if ack {
+			qh.insts[i].ack++
+		} else {
+			qh.insts[i].rej++
+		}
+	}
+}
+
+func (qh *quorumHelper) result() (_ack int, _rej int, _ electionResult) {
+	result := electionWon
+	var rAck, rRej int
+	for _, inst := range qh.insts {
+		ack, rej, res := inst.result()
+		switch res {
+		case electionLost:
+			return ack, rej, res
+		case electionIndeterminate:
+			rAck, rRej, result = ack, rej, electionIndeterminate
+		}
+	}
+	return rAck, rRej, result
+}
+
+type vote struct {
+	voters   int
+	canVote  func(id uint64) bool
+	ack, rej int
+}
+
+func (v *vote) result() (_ack int, _rej int, _ electionResult) {
+	q := v.voters/2 + 1
+
+	result := electionIndeterminate
+	if v.ack >= q {
+		result = electionWon
+	} else if v.rej >= q {
+		result = electionLost
+	}
+	return v.ack, v.rej, result
+}
+
+func (p *prs) makeQuorumHelper() quorumHelper {
+	insts := [1]vote{{
+		voters: len(p.nodes),
+		canVote: func(id uint64) bool {
+			_, ok := p.nodes[id]
+			return ok
+		}},
+	}
+	return quorumHelper{
+		insts: insts[:],
+	}
+}
+
+func (p *prs) quorum(f func(qh quorumHelper)) (ack int, rej int, _ electionResult) {
+	qh := p.makeQuorumHelper()
+	qh.seen = nil // TODO(tbg): reuse scratch buffer
+	f(qh)
+	return qh.result()
 }
 
 // committed returns the largest log index known to be committed based on what
@@ -339,7 +415,8 @@ func (p *prs) committed() uint64 {
 		idx++
 	}
 	sort.Sort(mis)
-	return mis[len(mis)-p.quorum()]
+	pos := len(mis) - (len(p.nodes)/2 + 1)
+	return mis[pos]
 }
 
 func (p *prs) removeAny(id uint64) {
@@ -397,14 +474,12 @@ func (p *prs) visit(f func(id uint64, pr *Progress)) {
 // the view of the local raft state machine. Otherwise, it returns
 // false.
 func (p *prs) quorumActive() bool {
-	var act int
-	p.visit(func(id uint64, pr *Progress) {
-		if pr.RecentActive && !pr.IsLearner {
-			act++
-		}
+	_, _, result := p.quorum(func(qh quorumHelper) {
+		p.visit(func(id uint64, pr *Progress) {
+			qh.record(id, pr.RecentActive && !pr.IsLearner)
+		})
 	})
-
-	return act >= p.quorum()
+	return result == electionWon
 }
 
 func (p *prs) voterNodes() []uint64 {
@@ -427,36 +502,17 @@ func (p *prs) learnerNodes() []uint64 {
 
 // resetVotes prepares for a new round of vote counting via recordVote.
 func (p *prs) resetVotes() {
-	p.votes = map[uint64]bool{}
+	p.votes = p.makeQuorumHelper()
 }
 
 // recordVote records that the node with the given id voted for this Raft
-// instance if v == true (and declined it otherwise).
-func (p *prs) recordVote(id uint64, v bool) {
-	_, ok := p.votes[id]
-	if !ok {
-		p.votes[id] = v
-	}
+// instance if ack == true (and declined it otherwise).
+func (p *prs) recordVote(id uint64, ack bool) {
+	p.votes.record(id, ack)
 }
 
 // tallyVotes returns the number of granted and rejected votes, and whether the
 // election outcome is known.
 func (p *prs) tallyVotes() (granted int, rejected int, result electionResult) {
-	for _, v := range p.votes {
-		if v {
-			granted++
-		} else {
-			rejected++
-		}
-	}
-
-	q := p.quorum()
-
-	result = electionIndeterminate
-	if granted >= q {
-		result = electionWon
-	} else if rejected >= q {
-		result = electionLost
-	}
-	return granted, rejected, result
+	return p.votes.result()
 }
