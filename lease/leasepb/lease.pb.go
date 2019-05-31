@@ -16,16 +16,12 @@ package leasepb
 
 import (
 	"fmt"
-
-	proto "github.com/golang/protobuf/proto"
-
+	io "io"
 	math "math"
 
 	_ "github.com/gogo/protobuf/gogoproto"
-
-	etcdserverpb "go.etcd.io/etcd/etcdserver/etcdserverpb"
-
-	io "io"
+	proto "github.com/golang/protobuf/proto"
+	etcdserverpb "go.etcd.io/etcd/v3/etcdserver/etcdserverpb"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

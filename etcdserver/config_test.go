@@ -18,8 +18,7 @@ import (
 	"net/url"
 	"testing"
 
-	"go.etcd.io/etcd/pkg/types"
-
+	"go.etcd.io/etcd/v3/pkg/types"
 	"go.uber.org/zap"
 )
 
@@ -196,8 +195,8 @@ func TestWALDir(t *testing.T) {
 
 func TestShouldDiscover(t *testing.T) {
 	tests := map[string]bool{
-		"":                              false,
-		"foo":                           true,
+		"":    false,
+		"foo": true,
 		"http://discovery.etcd.io/asdf": true,
 	}
 	for durl, w := range tests {

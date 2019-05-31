@@ -17,9 +17,8 @@ package command
 import (
 	"fmt"
 
-	"go.etcd.io/etcd/version"
-
 	"github.com/spf13/cobra"
+	"go.etcd.io/etcd/v3/version"
 )
 
 // NewVersionCommand prints out the version of etcd.

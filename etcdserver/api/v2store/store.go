@@ -23,10 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"go.etcd.io/etcd/etcdserver/api/v2error"
-	"go.etcd.io/etcd/pkg/types"
-
 	"github.com/jonboulle/clockwork"
+	"go.etcd.io/etcd/v3/etcdserver/api/v2error"
+	"go.etcd.io/etcd/v3/pkg/types"
 )
 
 // The default version to set when the store is first initialized.

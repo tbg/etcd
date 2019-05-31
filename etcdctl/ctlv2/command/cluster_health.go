@@ -24,9 +24,8 @@ import (
 	"os/signal"
 	"time"
 
-	"go.etcd.io/etcd/client"
-
 	"github.com/urfave/cli"
+	"go.etcd.io/etcd/v3/client"
 )
 
 func NewClusterHealthCommand() cli.Command {

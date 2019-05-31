@@ -21,9 +21,8 @@ import (
 	"os"
 	"os/signal"
 
-	"go.etcd.io/etcd/client"
-
 	"github.com/urfave/cli"
+	"go.etcd.io/etcd/v3/client"
 )
 
 // NewWatchCommand returns the CLI command for "watch".

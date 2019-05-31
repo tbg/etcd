@@ -5,22 +5,15 @@ package etcdserverpb
 
 import (
 	"fmt"
-
-	proto "github.com/golang/protobuf/proto"
-
+	io "io"
 	math "math"
 
 	_ "github.com/gogo/protobuf/gogoproto"
-
-	mvccpb "go.etcd.io/etcd/mvcc/mvccpb"
-
-	authpb "go.etcd.io/etcd/auth/authpb"
-
+	proto "github.com/golang/protobuf/proto"
+	authpb "go.etcd.io/etcd/v3/auth/authpb"
+	mvccpb "go.etcd.io/etcd/v3/mvcc/mvccpb"
 	context "golang.org/x/net/context"
-
 	grpc "google.golang.org/grpc"
-
-	io "io"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.

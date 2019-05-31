@@ -25,13 +25,12 @@ import (
 	"time"
 
 	"github.com/bgentry/speakeasy"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/flags"
-	"go.etcd.io/etcd/pkg/srv"
-	"go.etcd.io/etcd/pkg/transport"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.etcd.io/etcd/v3/clientv3"
+	"go.etcd.io/etcd/v3/pkg/flags"
+	"go.etcd.io/etcd/v3/pkg/srv"
+	"go.etcd.io/etcd/v3/pkg/transport"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/grpclog"
 )

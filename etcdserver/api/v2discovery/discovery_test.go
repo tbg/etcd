@@ -26,11 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/zap"
-
-	"go.etcd.io/etcd/client"
-
 	"github.com/jonboulle/clockwork"
+	"go.etcd.io/etcd/v3/client"
+	"go.uber.org/zap"
 )
 
 const (

@@ -21,10 +21,9 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"go.etcd.io/etcd/lease"
-	"go.etcd.io/etcd/pkg/report"
-
 	"github.com/spf13/cobra"
+	"go.etcd.io/etcd/v3/lease"
+	"go.etcd.io/etcd/v3/pkg/report"
 )
 
 // mvccPutCmd represents a storage put performance benchmarking tool

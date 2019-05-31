@@ -22,9 +22,8 @@ import (
 	"os/exec"
 	"os/signal"
 
-	"go.etcd.io/etcd/client"
-
 	"github.com/urfave/cli"
+	"go.etcd.io/etcd/v3/client"
 )
 
 // NewExecWatchCommand returns the CLI command for "exec-watch".

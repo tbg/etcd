@@ -29,12 +29,11 @@ import (
 	"strings"
 	"time"
 
-	"go.etcd.io/etcd/client"
-	"go.etcd.io/etcd/pkg/transport"
-	"go.etcd.io/etcd/pkg/types"
-
 	"github.com/coreos/pkg/capnslog"
 	"github.com/jonboulle/clockwork"
+	"go.etcd.io/etcd/v3/client"
+	"go.etcd.io/etcd/v3/pkg/transport"
+	"go.etcd.io/etcd/v3/pkg/types"
 	"go.uber.org/zap"
 )
 

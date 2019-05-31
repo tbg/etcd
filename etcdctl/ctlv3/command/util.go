@@ -25,10 +25,9 @@ import (
 	"strings"
 	"time"
 
-	v3 "go.etcd.io/etcd/clientv3"
-	pb "go.etcd.io/etcd/mvcc/mvccpb"
-
 	"github.com/spf13/cobra"
+	v3 "go.etcd.io/etcd/v3/clientv3"
+	pb "go.etcd.io/etcd/v3/mvcc/mvccpb"
 )
 
 func printKV(isHex bool, valueOnly bool, kv *pb.KeyValue) {

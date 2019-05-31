@@ -20,9 +20,8 @@ import (
 	"strings"
 	"testing"
 
-	"go.etcd.io/etcd/pkg/logutil"
-
 	"github.com/coreos/pkg/capnslog"
+	"go.etcd.io/etcd/v3/pkg/logutil"
 )
 
 func TestPackageLogger(t *testing.T) {

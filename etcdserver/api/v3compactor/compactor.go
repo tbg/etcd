@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"time"
 
-	pb "go.etcd.io/etcd/etcdserver/etcdserverpb"
-
 	"github.com/coreos/pkg/capnslog"
 	"github.com/jonboulle/clockwork"
+	pb "go.etcd.io/etcd/v3/etcdserver/etcdserverpb"
 	"go.uber.org/zap"
 )
 

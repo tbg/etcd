@@ -19,12 +19,11 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"go.etcd.io/etcd/lease/leasepb"
-	"go.etcd.io/etcd/mvcc"
-	"go.etcd.io/etcd/mvcc/backend"
-	"go.etcd.io/etcd/mvcc/mvccpb"
-
 	bolt "go.etcd.io/bbolt"
+	"go.etcd.io/etcd/v3/lease/leasepb"
+	"go.etcd.io/etcd/v3/mvcc"
+	"go.etcd.io/etcd/v3/mvcc/backend"
+	"go.etcd.io/etcd/v3/mvcc/mvccpb"
 )
 
 func snapDir(dataDir string) string {

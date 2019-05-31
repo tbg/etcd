@@ -25,10 +25,9 @@ import (
 	"text/tabwriter"
 	"text/template"
 
-	"go.etcd.io/etcd/version"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"go.etcd.io/etcd/v3/version"
 )
 
 var (

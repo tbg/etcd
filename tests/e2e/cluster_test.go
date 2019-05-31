@@ -21,7 +21,7 @@ import (
 	"os"
 	"strings"
 
-	"go.etcd.io/etcd/etcdserver"
+	"go.etcd.io/etcd/v3/etcdserver"
 )
 
 const etcdProcessBasePort = 20000
@@ -83,7 +83,7 @@ var (
 		clientTLS:             clientTLS,
 		initialToken:          "new",
 		clientCertAuthEnabled: true,
-		noCN:                  true,
+		noCN: true,
 	}
 	configJWT = etcdProcessClusterConfig{
 		clusterSize:   1,

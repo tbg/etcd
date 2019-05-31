@@ -23,9 +23,8 @@ import (
 	"reflect"
 	"sync"
 
-	"go.etcd.io/etcd/pkg/logutil"
-
 	"github.com/coreos/pkg/capnslog"
+	"go.etcd.io/etcd/v3/pkg/logutil"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"

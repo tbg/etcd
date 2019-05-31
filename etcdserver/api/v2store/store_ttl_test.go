@@ -18,10 +18,9 @@ import (
 	"testing"
 	"time"
 
-	"go.etcd.io/etcd/etcdserver/api/v2error"
-	"go.etcd.io/etcd/pkg/testutil"
-
 	"github.com/jonboulle/clockwork"
+	"go.etcd.io/etcd/v3/etcdserver/api/v2error"
+	"go.etcd.io/etcd/v3/pkg/testutil"
 )
 
 // Ensure that any TTL <= minExpireTime becomes Permanent

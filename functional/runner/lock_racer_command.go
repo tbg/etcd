@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	"go.etcd.io/etcd/clientv3/concurrency"
-
 	"github.com/spf13/cobra"
+	"go.etcd.io/etcd/v3/clientv3/concurrency"
 )
 
 // NewLockRacerCommand returns the cobra command for "lock-racer runner".
