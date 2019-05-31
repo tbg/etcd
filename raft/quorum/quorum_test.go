@@ -16,134 +16,11 @@ package quorum
 
 import (
 	"fmt"
-	"math/rand"
-	"reflect"
 	"strings"
 	"testing"
-	"testing/quick"
 
 	"github.com/cockroachdb/datadriven"
 )
-
-type mapLookuper map[uint64]uint64
-
-func (m mapLookuper) Index(id uint64) (uint64, bool) {
-	idx, ok := m[id]
-	return idx, ok
-}
-
-func genMap(rand *rand.Rand, size int) map[uint64]uint64 {
-	// Hard-code a reasonably small size here (quick will hard-code 50, which
-	// is not useful here).
-	size = 11
-
-	n1, n2 := rand.Intn(size), rand.Intn(size)
-	sl1, sl2 := rand.Perm(2 * n1)[:n1], rand.Perm(2 * n2)[:n2]
-
-	m := map[uint64]uint64{}
-	n := len(sl1)
-	if len(sl2) < len(sl1) {
-		n = len(sl2)
-	}
-	for i := 0; i < n; i++ {
-		m[uint64(sl1[i])] = uint64(sl2[i])
-	}
-	return m
-}
-
-type idxMap map[uint64]uint64
-
-func (idxMap) Generate(rand *rand.Rand, size int) reflect.Value {
-	m := genMap(rand, size)
-	return reflect.ValueOf(m)
-}
-
-type memberMap map[uint64]struct{}
-
-func (memberMap) Generate(rand *rand.Rand, size int) reflect.Value {
-	m := genMap(rand, size)
-	mm := map[uint64]struct{}{}
-	for id := range m {
-		mm[id] = struct{}{}
-	}
-	return reflect.ValueOf(mm)
-}
-
-func hideLookuper(
-	f func(MajorityConfig, IndexLookuper) (uint64, bool),
-) func(memberMap, idxMap) (uint64, bool) {
-	return func(v memberMap, l idxMap) (uint64, bool) {
-		return f(MajorityConfig(v), mapLookuper(l))
-	}
-}
-
-func majorityCommittedIdx(c MajorityConfig, l IndexLookuper) (uint64, bool) {
-	return MajorityConfig(c).CommittedIndex(l)
-}
-
-func alternativeMajorityCommittedIndex(c MajorityConfig, l IndexLookuper) (_committedIdx uint64, _malleable bool) {
-	idToIdx := map[uint64]uint64{}
-	for id := range c {
-		if idx, ok := l.Index(id); ok {
-			idToIdx[id] = idx
-		}
-	}
-
-	pendingVotes := len(c) - len(idToIdx)
-
-	// Build a map from index to voters who have acked that or any higher index.
-	idxToVotes := map[uint64]int{}
-	for _, idx := range idToIdx {
-		idxToVotes[idx] = 0
-	}
-
-	for _, idx := range idToIdx {
-		for idy := range idxToVotes {
-			if idy > idx {
-				continue
-			}
-			idxToVotes[idy]++
-		}
-	}
-
-	// Find the maximum index that has achieved quorum.
-	q := len(c)/2 + 1
-	var maxQuorumIdx uint64
-	for idx, n := range idxToVotes {
-		if n >= q && idx > maxQuorumIdx {
-			maxQuorumIdx = idx
-		}
-	}
-
-	// Check whether there's a higher index that could receive
-	// more votes, reach a quorum, and thus increase maxQuorumIdx
-	// in the future.
-	final := pendingVotes < q
-	for idx, n := range idxToVotes {
-		if idx <= maxQuorumIdx {
-			continue
-		}
-		if n+pendingVotes >= q {
-			final = false
-			break
-		}
-	}
-
-	return maxQuorumIdx, final
-}
-
-func TestVoteParity(t *testing.T) {
-	cfg := &quick.Config{
-		MaxCount: 10000,
-	}
-	if err := quick.CheckEqual(
-		hideLookuper(majorityCommittedIdx),
-		hideLookuper(alternativeMajorityCommittedIndex),
-		cfg,
-	); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestMajorityQuorum(t *testing.T) {
 
@@ -281,32 +158,10 @@ committed cfg=(1, 2, 3, 4, 5) idx=(101, 102, 103, 103)
 
 		var buf strings.Builder
 		if aidx, afinal := alternativeMajorityCommittedIndex(c, l); aidx != idx || afinal != final {
-			fmt.Fprintf(&buf, "%d (%s) <-- via alternative computation", aidx, s[afinal])
+			fmt.Fprintf(&buf, "%d (%s) <-- via alternative computation\n", aidx, s[afinal])
 		}
 
 		fmt.Fprintf(&buf, "%d (%s)\n", idx, s[final])
 		return buf.String()
 	})
 }
-
-// 0 0 0 1 bet
-// 0 x x    malleable
-
-// 0 0 . 2 idToIdx
-// . 0 0 not malleable
-
-// 0 0 0 11 15 malleable
-// 11 15 . . .
-
-// 0 0 10 11 15
-// 10 11 15 xx xx malleable
-
-//     |
-// x 0 0 1 1
-
-// val(mididx + missing) > val(mididx)
-
-//     |
-// x x x x x
-
-// . . 1 2 3
