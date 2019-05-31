@@ -49,7 +49,7 @@ type MajorityConfig map[uint64]struct{}
 func (c MajorityConfig) CommittedIndex(l IndexLookuper) (committedIdx uint64, final bool) {
 	n := len(c)
 	if n == 0 {
-		return 0, false
+		return 0, true
 	}
 
 	var scratchBuf struct {
@@ -89,56 +89,4 @@ func (c MajorityConfig) CommittedIndex(l IndexLookuper) (committedIdx uint64, fi
 
 type IndexLookuper interface {
 	Index(voterID uint64) (idx uint64, found bool)
-}
-
-// metamorphic: add bogus voter to nToIdx
-func dumbMajorityCommittedIdx(voters map[uint64]struct{}, l IndexLookuper) (_committedIdx uint64, _malleable bool) {
-	idToIdx := map[uint64]uint64{}
-	for id := range voters {
-		if idx, ok := l.Index(id); ok {
-			idToIdx[id] = idx
-		}
-	}
-
-	pendingVotes := len(voters) - len(idToIdx)
-
-	// Build a map from index to voters who have acked that or any higher index.
-	idxToVotes := map[uint64]int{}
-	for _, idx := range idToIdx {
-		idxToVotes[idx] = 0
-	}
-
-	for _, idx := range idToIdx {
-		for idy := range idxToVotes {
-			if idy > idx {
-				continue
-			}
-			idxToVotes[idy]++
-		}
-	}
-
-	// Find the maximum index that has achieved quorum.
-	q := len(voters)/2 + 1
-	var maxQuorumIdx uint64
-	for idx, n := range idxToVotes {
-		if n >= q && idx > maxQuorumIdx {
-			maxQuorumIdx = idx
-		}
-	}
-
-	// Check whether there's a higher index that could receive
-	// more votes, reach a quorum, and thus increase maxQuorumIdx
-	// in the future.
-	var malleable bool
-	for idx, n := range idxToVotes {
-		if idx <= maxQuorumIdx {
-			continue
-		}
-		if n+pendingVotes >= q {
-			malleable = true
-			break
-		}
-	}
-
-	return maxQuorumIdx, malleable
 }
