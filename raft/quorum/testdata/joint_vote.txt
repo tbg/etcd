@@ -1,0 +1,163 @@
+# Empty joint config wins all votes. This isn't used in production.
+vote cfgj=zero
+----
+VoteWon
+
+# More examples with close to trivial configs.
+
+vote cfg=(1) cfgj=zero
+----
+VotePending
+
+vote cfg=(1) cfgj=zero votes=(y)
+----
+VoteWon
+
+vote cfg=(1) cfgj=zero votes=(n)
+----
+VoteLost
+
+vote cfg=(1) cfgj=(1)
+----
+VotePending
+
+vote cfg=(1) cfgj=(1) votes=(y)
+----
+VoteWon
+
+vote cfg=(1) cfgj=(1) votes=(n)
+----
+VoteLost
+
+vote cfg=(1) cfgj=(2)
+----
+VotePending
+
+vote cfg=(1) cfgj=(2) votes=(y)
+----
+VotePending
+
+vote cfg=(1) cfgj=(2) votes=(y,y)
+----
+VoteWon
+
+vote cfg=(1) cfgj=(2) votes=(y,n)
+----
+VoteLost
+
+vote cfg=(1) cfgj=(2) votes=(n)
+----
+VoteLost
+
+vote cfg=(1) cfgj=(2) votes=(n,n)
+----
+VoteLost
+
+vote cfg=(1) cfgj=(2) votes=(n,y)
+----
+VoteLost
+
+# Two node configs.
+
+vote cfg=(1,2) cfgj=(3,4)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y,y)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y,y,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y,y,n,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y,y,y,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(3,4) votes=(y,y,y,y)
+----
+VoteWon
+
+vote cfg=(1,2) cfgj=(2,3)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(2,3) votes=(_,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(2,3) votes=(y,y)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(2,3) votes=(y,y,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(2,3) votes=(y,y,y)
+----
+VoteWon
+
+vote cfg=(1,2) cfgj=(1,2)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(1,2) votes=(y)
+----
+VotePending
+
+vote cfg=(1,2) cfgj=(1,2) votes=(y,n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(1,2) votes=(n)
+----
+VoteLost
+
+vote cfg=(1,2) cfgj=(1,2) votes=(n,n)
+----
+VoteLost
+
+
+# Simple example for overlapping three node configs.
+
+vote cfg=(1,2,3) cfgj=(2,3,4)
+----
+VotePending
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(_,n)
+----
+VotePending
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(_,n,n)
+----
+VoteLost
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(_,y,y)
+----
+VoteWon
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(y,y)
+----
+VotePending
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(y,y,n)
+----
+VotePending
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(y,y,n,n)
+----
+VoteLost
+
+vote cfg=(1,2,3) cfgj=(2,3,4) votes=(y,y,n,y)
+----
+VoteWon
