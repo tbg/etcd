@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"go.etcd.io/etcd/raft/quorum"
 	pb "go.etcd.io/etcd/raft/raftpb"
 )
 
@@ -737,7 +738,7 @@ func (r *raft) campaign(t CampaignType) {
 		voteMsg = pb.MsgVote
 		term = r.Term
 	}
-	if _, _, res := r.poll(r.id, voteRespMsgType(voteMsg), true); res == electionWon {
+	if _, _, res := r.poll(r.id, voteRespMsgType(voteMsg), true); res == quorum.VoteWon {
 		// We won the election after voting for ourselves (which must mean that
 		// this is a single-node cluster). Advance to the next state.
 		if t == campaignPreElection {
@@ -747,7 +748,7 @@ func (r *raft) campaign(t CampaignType) {
 		}
 		return
 	}
-	for id := range r.prs.nodes {
+	for id := range r.prs.voters.IDs() {
 		if id == r.id {
 			continue
 		}
@@ -762,15 +763,7 @@ func (r *raft) campaign(t CampaignType) {
 	}
 }
 
-type electionResult byte
-
-const (
-	electionIndeterminate electionResult = iota
-	electionLost
-	electionWon
-)
-
-func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected int, result electionResult) {
+func (r *raft) poll(id uint64, t pb.MessageType, v bool) (granted int, rejected int, result quorum.VoteResult) {
 	if v {
 		r.logger.Infof("%x received %s from %x at term %d", r.id, t, id, r.Term)
 	} else {
@@ -988,7 +981,9 @@ func stepLeader(r *raft, m pb.Message) error {
 		r.bcastAppend()
 		return nil
 	case pb.MsgReadIndex:
-		if !r.prs.isSingleton() { // more than one voting member in cluster
+		// If more than the local vote is needed, go through a full broadcast,
+		// otherwise optimize.
+		if !r.prs.isSingleton() {
 			if r.raftLog.zeroTermOnErrCompacted(r.raftLog.term(r.raftLog.committed)) != r.Term {
 				// Reject read only request when this leader has not committed any log entry at its term.
 				return nil
@@ -1099,7 +1094,7 @@ func stepLeader(r *raft, m pb.Message) error {
 			return nil
 		}
 
-		if !r.prs.hasQuorum(r.readOnly.recvAck(m.From, m.Context)) {
+		if r.prs.voters.VoteResult(r.readOnly.recvAck(m.From, m.Context)) != quorum.VoteWon {
 			return nil
 		}
 
@@ -1199,14 +1194,14 @@ func stepCandidate(r *raft, m pb.Message) error {
 		gr, rj, res := r.poll(m.From, m.Type, !m.Reject)
 		r.logger.Infof("%x has received %d %s votes and %d vote rejections", r.id, gr, m.Type, rj)
 		switch res {
-		case electionWon:
+		case quorum.VoteWon:
 			if r.state == StatePreCandidate {
 				r.campaign(campaignElection)
 			} else {
 				r.becomeLeader()
 				r.bcastAppend()
 			}
-		case electionLost:
+		case quorum.VoteLost:
 			// pb.MsgPreVoteResp contains future term of pre-candidate
 			// m.Term > r.Term; reuse r.Term
 			r.becomeFollower(r.Term, None)
@@ -1406,7 +1401,7 @@ func (r *raft) removeNode(id uint64) {
 	r.prs.removeAny(id)
 
 	// Do not try to commit or abort transferring if the cluster is now empty.
-	if len(r.prs.nodes) == 0 && len(r.prs.learners) == 0 {
+	if len(r.prs.voters[0]) == 0 && len(r.prs.learners) == 0 {
 		return
 	}
 
