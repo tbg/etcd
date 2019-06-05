@@ -151,31 +151,12 @@ func (rn *RawNode) Propose(data []byte) error {
 }
 
 // ProposeConfChange proposes a config change.
-func (rn *RawNode) ProposeConfChange(cc pb.ConfChange) error {
-	data, err := cc.Marshal()
+func (rn *RawNode) ProposeConfChange(ccer pb.ConfChangeV2er) error {
+	msg, err := confChangeToMsg(ccer)
 	if err != nil {
 		return err
 	}
-	return rn.raft.Step(pb.Message{
-		Type: pb.MsgProp,
-		Entries: []pb.Entry{
-			{Type: pb.EntryConfChange, Data: data},
-		},
-	})
-}
-
-// ProposeConfChangeV2 proposes a config change.
-func (rn *RawNode) ProposeConfChangeV2(cc pb.ConfChangeV2) error {
-	data, err := cc.Marshal()
-	if err != nil {
-		return err
-	}
-	return rn.raft.Step(pb.Message{
-		Type: pb.MsgProp,
-		Entries: []pb.Entry{
-			{Type: pb.EntryConfChangeV2, Data: data},
-		},
-	})
+	return rn.raft.Step(msg)
 }
 
 // ApplyConfChange applies a config change to the local node.
@@ -349,9 +330,6 @@ func (a *rawNodeAdapter) ReadIndex(_ context.Context, rctx []byte) error {
 }
 func (a *rawNodeAdapter) Step(_ context.Context, m pb.Message) error   { return a.RawNode.Step(m) }
 func (a *rawNodeAdapter) Propose(_ context.Context, data []byte) error { return a.RawNode.Propose(data) }
-func (a *rawNodeAdapter) ProposeConfChangeV2(_ context.Context, cc pb.ConfChangeV2) error {
-	return a.RawNode.ProposeConfChangeV2(cc)
-}
-func (a *rawNodeAdapter) ProposeConfChange(_ context.Context, cc pb.ConfChange) error {
-	return a.RawNode.ProposeConfChange(cc)
+func (a *rawNodeAdapter) ProposeConfChange(_ context.Context, ccer pb.ConfChangeV2er) error {
+	return a.RawNode.ProposeConfChange(ccer)
 }

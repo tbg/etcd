@@ -148,7 +148,8 @@ enum ConfChangeTransition {
 //
 // The provided ConfChangeTransition specifies how (and whether) Joint Consensus
 // is used, and assigns the task of leaving the joint configuration either to
-// Raft or the application.
+// Raft or the application. Leaving the joint configuration is accomplished by
+// proposing an empty config change.
 //
 // For details on Raft membership changes, see:
 //
@@ -156,6 +157,5 @@ enum ConfChangeTransition {
 message ConfChangeV2 {
     optional ConfChangeTransition transition = 1 [(gogoproto.nullable) = false];
     repeated ConfChangeSimple     changes =    2 [(gogoproto.nullable) = false];
-	optional bool                 manual  =    3 [(gogoproto.nullable) = false];
-	optional bytes                context =    4;
+	optional bytes                context =    3;
 }

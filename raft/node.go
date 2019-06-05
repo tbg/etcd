@@ -132,7 +132,7 @@ type Node interface {
 	// Propose proposes that data be appended to the log. Note that proposals can be lost without
 	// notice, therefore it is user's job to ensure proposal retries.
 	Propose(ctx context.Context, data []byte) error
-	// ProposeConfChangeV2 proposes a configuration change. Like any proposal, the
+	// ProposeConfChange proposes a configuration change. Like any proposal, the
 	// configuration change may be dropped with or without an error being
 	// returned. In addition, configuration changes are only accepted when the
 	// leader has certainty that there is no prior unapplied configuration
@@ -142,8 +142,7 @@ type Node interface {
 	// the cluster run a version of this library aware of the V2 API.
 	//
 	// See pb.ConfChangeV2 for usage details and semantics.
-	ProposeConfChangeV2(ctx context.Context, cc pb.ConfChangeV2) error
-	ProposeConfChange(ctx context.Context, cc pb.ConfChange) error
+	ProposeConfChange(ctx context.Context, cc pb.ConfChangeV2er) error
 
 	// Step advances the state machine using the given message. ctx.Err() will be returned, if any.
 	Step(ctx context.Context, msg pb.Message) error
@@ -470,20 +469,28 @@ func (n *node) Step(ctx context.Context, m pb.Message) error {
 	return n.step(ctx, m)
 }
 
-func (n *node) ProposeConfChangeV2(ctx context.Context, cc pb.ConfChangeV2) error {
+func confChangeToMsg(ccer pb.ConfChangeV2er) (pb.Message, error) {
+	if lcc, legacy := ccer.(*pb.ConfChange); legacy {
+		data, err := lcc.Marshal()
+		if err != nil {
+			return pb.Message{}, err
+		}
+		return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChange, Data: data}}}, nil
+	}
+	cc := ccer.AsConfChangeV2()
 	data, err := cc.Marshal()
 	if err != nil {
-		return err
+		return pb.Message{}, err
 	}
-	return n.Step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChangeV2, Data: data}}})
+	return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChangeV2, Data: data}}}, nil
 }
 
-func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChange) error {
-	data, err := cc.Marshal()
+func (n *node) ProposeConfChange(ctx context.Context, ccer pb.ConfChangeV2er) error {
+	msg, err := confChangeToMsg(ccer)
 	if err != nil {
 		return err
 	}
-	return n.Step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChange, Data: data}}})
+	return n.Step(ctx, msg)
 }
 
 func (n *node) step(ctx context.Context, m pb.Message) error {
