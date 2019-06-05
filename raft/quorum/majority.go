@@ -25,6 +25,16 @@ import (
 // MajorityConfig is a set of IDs that uses majority quorums to make decisions.
 type MajorityConfig map[uint64]struct{}
 
+// Slice returns a slice containing the voters in the quorum in ascending order.
+func (c MajorityConfig) Slice() []uint64 {
+	sl := make([]uint64, 0, len(c))
+	for id := range c {
+		sl = append(sl, id)
+	}
+	sort.Slice(sl, func(i, j int) bool { return i < j })
+	return sl
+}
+
 // Describe returns a (multi-line) representation of the commit indexes for the
 // given lookuper.
 func (c MajorityConfig) Describe(l IndexLookuper) string {

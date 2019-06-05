@@ -18,12 +18,11 @@ package quorum
 // majority configurations. Decisions require the support of both majorities.
 type JointConfig [2]MajorityConfig
 
-// IDs returns a newly initialized map representing the set of voters present
-// in the joint configuration.
-func (c JointConfig) IDs() map[uint64]struct{} {
+// Union returns a map corresponding to the union of the joint majority quorums.
+func (c JointConfig) Union() map[uint64]struct{} {
 	m := map[uint64]struct{}{}
-	for _, cc := range c {
-		for id := range cc {
+	for _, mc := range c {
+		for id := range mc {
 			m[id] = struct{}{}
 		}
 	}
@@ -33,7 +32,7 @@ func (c JointConfig) IDs() map[uint64]struct{} {
 // Describe returns a (multi-line) representation of the commit indexes for the
 // given lookuper.
 func (c JointConfig) Describe(l IndexLookuper) string {
-	return MajorityConfig(c.IDs()).Describe(l)
+	return MajorityConfig(c.Union()).Describe(l)
 }
 
 func min(a, b uint64) uint64 {
