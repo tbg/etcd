@@ -964,7 +964,7 @@ func stepLeader(r *raft, m pb.Message) error {
 
 		for i := range m.Entries {
 			e := &m.Entries[i]
-			if e.Type == pb.EntryConfChange {
+			if e.Type == pb.EntryConfChange || e.Type == pb.EntryConfChangeV2 {
 				if r.pendingConfIndex > r.raftLog.applied {
 					r.logger.Infof("propose conf %s ignored since pending unapplied configuration [index %d, applied %d]",
 						e, r.pendingConfIndex, r.raftLog.applied)
@@ -1493,7 +1493,7 @@ func (r *raft) reduceUncommittedSize(ents []pb.Entry) {
 func numOfPendingConf(ents []pb.Entry) int {
 	n := 0
 	for i := range ents {
-		if ents[i].Type == pb.EntryConfChange {
+		if typ := ents[i].Type; typ == pb.EntryConfChange || typ == pb.EntryConfChangeV2 {
 			n++
 		}
 	}

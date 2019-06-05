@@ -10,8 +10,9 @@ option (gogoproto.goproto_getters_all) = false;
 option (gogoproto.goproto_enum_prefix_all) = false;
 
 enum EntryType {
-	EntryNormal     = 0;
-	EntryConfChange = 1;
+	EntryNormal       = 0;
+	EntryConfChange   = 1; // TODO(tbg): mark as deprecated
+	EntryConfChangeV2 = 2;
 }
 
 message Entry {
@@ -73,11 +74,15 @@ message HardState {
 	optional uint64 term   = 1 [(gogoproto.nullable) = false];
 	optional uint64 vote   = 2 [(gogoproto.nullable) = false];
 	optional uint64 commit = 3 [(gogoproto.nullable) = false];
+    // TODO(tbg): decide whether this optimization is justified.
+	// optional uint64 max_cfg_idx = 4 [(gogoproto.nullable) = false];
 }
 
 message ConfState {
-	repeated uint64 nodes    = 1;
-	repeated uint64 learners = 2;
+	repeated uint64 nodes          = 1;
+	repeated uint64 learners       = 2;
+	repeated uint64 nodes_joint    = 3;
+	repeated uint64 learners_joint = 4;
 }
 
 enum ConfChangeType {
@@ -87,9 +92,70 @@ enum ConfChangeType {
 	ConfChangeAddLearnerNode = 3;
 }
 
+// TODO(tbg): rename to reflect deprecation.
+// TODO(tbg): lowercase the field names.
 message ConfChange {
 	optional uint64          ID      = 1 [(gogoproto.nullable) = false];
 	optional ConfChangeType  Type    = 2 [(gogoproto.nullable) = false];
 	optional uint64          NodeID  = 3 [(gogoproto.nullable) = false];
 	optional bytes           Context = 4;
+}
+
+message ConfChangeSimple {
+	optional uint64          id      = 1 [(gogoproto.nullable) = false, (gogoproto.customname) = "ID" ];
+	optional ConfChangeType  type    = 2 [(gogoproto.nullable) = false];
+	optional uint64          node_id = 3 [(gogoproto.nullable) = false, (gogoproto.customname) = "NodeID"];
+}
+
+enum ConfChangeTransition {
+	// Automatically use the simple protocol if possible, otherwise fall back
+	// to ConfChangeJointImplicit.
+	ConfChangeTransitionAuto          = 0;
+	// Use joint consensus, but transition out of the joint configuration
+	// automatically by proposing a no-op configuration change.
+	ConfChangeTransitionJointImplicit = 1;
+    // Use joint consensus and remain in the joint configuration until the
+    // application proposes a no-op configuration change.
+	ConfChangeTransitionJointExplicit = 2;
+}
+
+// ConfChangeV2 messages initiate configuration changes. They support both the
+// simple "one at a time" membership change protocol and full Joint Consensus
+// allowing for arbitrary changes in membership.
+//
+// The supplied context is treated as an opaque payload and can be used to
+// attach an action on the state machine to the application of the config change
+// proposal. Note that contrary to Joint Consensus as outlined in the Raft
+// paper[1], configuration changes become active when they are *applied* to the
+// state machine (not when they are appended to the log).
+//
+// The simple protocol can be used whenever a direct transition into the new
+// configuration is safe. This is the case whenever the set of voting replicas
+// changes by at most one. For example, it's possible to add a voter and remove
+// three learners in one step using the simple protocol, but it's not possible
+// to replace a voter (because that amounts to two changes).
+//
+// Non-simple changes require the use of Joint Consensus, for which two
+// configuration changes are run. The first configuration change specifies the
+// desired changes and transitions the Raft group into the joint configuration,
+// in which quorum requires a majority of both the pre-changes and post-changes
+// configuration. Joint Consensus avoids entering fragile intermediate
+// configurations that could compromise survivability. For example, without the
+// use of Joint Consensus and running across three availability zones with a
+// replication factor of three, it is not possible to replace a voter without
+// entering an intermediate configuration that does not survive the outage of
+// one availability zone.
+//
+// The provided ConfChangeTransition specifies how (and whether) Joint Consensus
+// is used, and assigns the task of leaving the joint configuration either to
+// Raft or the application.
+//
+// For details on Raft membership changes, see:
+//
+// [1]: https://github.com/ongardie/dissertation/blob/master/online-trim.pdf
+message ConfChangeV2 {
+    optional ConfChangeTransition transition = 1 [(gogoproto.nullable) = false];
+    repeated ConfChangeSimple     changes =    2 [(gogoproto.nullable) = false];
+	optional bool                 manual  =    3 [(gogoproto.nullable) = false];
+	optional bytes                context =    4;
 }

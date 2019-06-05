@@ -163,6 +163,20 @@ func (rn *RawNode) ProposeConfChange(cc pb.ConfChange) error {
 	})
 }
 
+// ProposeConfChangeV2 proposes a config change.
+func (rn *RawNode) ProposeConfChangeV2(cc pb.ConfChangeV2) error {
+	data, err := cc.Marshal()
+	if err != nil {
+		return err
+	}
+	return rn.raft.Step(pb.Message{
+		Type: pb.MsgProp,
+		Entries: []pb.Entry{
+			{Type: pb.EntryConfChangeV2, Data: data},
+		},
+	})
+}
+
 // ApplyConfChange applies a config change to the local node.
 func (rn *RawNode) ApplyConfChange(cc pb.ConfChange) *pb.ConfState {
 	if cc.NodeID == None {

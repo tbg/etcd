@@ -132,10 +132,19 @@ type Node interface {
 	// Propose proposes that data be appended to the log. Note that proposals can be lost without
 	// notice, therefore it is user's job to ensure proposal retries.
 	Propose(ctx context.Context, data []byte) error
-	// ProposeConfChange proposes config change.
-	// At most one ConfChange can be in the process of going through consensus.
-	// Application needs to call ApplyConfChange when applying EntryConfChange type entry.
+	// ProposeConfChangeV2 proposes a configuration change. Like any proposal, the
+	// configuration change may be dropped with or without an error being
+	// returned. In addition, configuration changes are only accepted when the
+	// leader has certainty that there is no prior unapplied configuration
+	// change in its log.
+	//
+	// Calling ProposeConfChangeV2 is only allowed if all Nodes participating in
+	// the cluster run a version of this library aware of the V2 API.
+	//
+	// See pb.ConfChangeV2 for usage details and semantics.
+	ProposeConfChangeV2(ctx context.Context, cc pb.ConfChangeV2) error
 	ProposeConfChange(ctx context.Context, cc pb.ConfChange) error
+
 	// Step advances the state machine using the given message. ctx.Err() will be returned, if any.
 	Step(ctx context.Context, msg pb.Message) error
 
@@ -160,7 +169,7 @@ type Node interface {
 	// Returns an opaque ConfState protobuf which must be recorded
 	// in snapshots. Will never return nil; it returns a pointer only
 	// to match MemoryStorage.Compact.
-	ApplyConfChange(cc pb.ConfChange) *pb.ConfState
+	ApplyConfChange(cc pb.ConfChangeV2) *pb.ConfState
 
 	// TransferLeadership attempts to transfer leadership to the given transferee.
 	TransferLeadership(ctx context.Context, lead, transferee uint64)
