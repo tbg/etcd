@@ -179,7 +179,9 @@ func (rn *RawNode) ProposeConfChangeV2(cc pb.ConfChangeV2) error {
 }
 
 // ApplyConfChange applies a config change to the local node.
-func (rn *RawNode) ApplyConfChange(cc pb.ConfChange) *pb.ConfState {
+func (rn *RawNode) ApplyConfChange(ccc pb.ConfChangeV2er) *pb.ConfState {
+	// TODO(tbg): actually handle V2 properly.
+	cc := ccc.AsConfChangeV2().Changes[0]
 	if cc.NodeID == None {
 		return &pb.ConfState{Nodes: rn.raft.prs.voterNodes(), Learners: rn.raft.prs.learnerNodes()}
 	}
@@ -296,6 +298,8 @@ func (rn *RawNode) ReportSnapshot(id uint64, status SnapshotStatus) {
 }
 
 // TransferLeader tries to transfer leadership to the given transferee.
+//
+// TODO(tbg): rename to TransferLeadership
 func (rn *RawNode) TransferLeader(transferee uint64) {
 	_ = rn.raft.Step(pb.Message{Type: pb.MsgTransferLeader, From: transferee})
 }

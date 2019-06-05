@@ -169,7 +169,7 @@ type Node interface {
 	// Returns an opaque ConfState protobuf which must be recorded
 	// in snapshots. Will never return nil; it returns a pointer only
 	// to match MemoryStorage.Compact.
-	ApplyConfChange(cc pb.ConfChangeV2) *pb.ConfState
+	ApplyConfChange(cc pb.ConfChangeV2er) *pb.ConfState
 
 	// TransferLeadership attempts to transfer leadership to the given transferee.
 	TransferLeadership(ctx context.Context, lead, transferee uint64)
@@ -265,7 +265,7 @@ type msgWithResult struct {
 type node struct {
 	propc      chan msgWithResult
 	recvc      chan pb.Message
-	confc      chan pb.ConfChange
+	confc      chan pb.ConfChangeV2
 	confstatec chan pb.ConfState
 	readyc     chan Ready
 	advancec   chan struct{}
@@ -281,7 +281,7 @@ func newNode() node {
 	return node{
 		propc:      make(chan msgWithResult),
 		recvc:      make(chan pb.Message),
-		confc:      make(chan pb.ConfChange),
+		confc:      make(chan pb.ConfChangeV2),
 		confstatec: make(chan pb.ConfState),
 		readyc:     make(chan Ready),
 		advancec:   make(chan struct{}),
@@ -365,7 +365,9 @@ func (n *node) run(r *raft) {
 			if pr := r.prs.getProgress(m.From); pr != nil || !IsResponseMsg(m.Type) {
 				r.Step(m)
 			}
-		case cc := <-n.confc:
+		case ccc := <-n.confc:
+			// TODO(tbg): actually handle more than the first change.
+			cc := ccc.Changes[0]
 			if cc.NodeID == None {
 				select {
 				case n.confstatec <- pb.ConfState{
@@ -468,6 +470,14 @@ func (n *node) Step(ctx context.Context, m pb.Message) error {
 	return n.step(ctx, m)
 }
 
+func (n *node) ProposeConfChangeV2(ctx context.Context, cc pb.ConfChangeV2) error {
+	data, err := cc.Marshal()
+	if err != nil {
+		return err
+	}
+	return n.Step(ctx, pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChangeV2, Data: data}}})
+}
+
 func (n *node) ProposeConfChange(ctx context.Context, cc pb.ConfChange) error {
 	data, err := cc.Marshal()
 	if err != nil {
@@ -534,7 +544,8 @@ func (n *node) Advance() {
 	}
 }
 
-func (n *node) ApplyConfChange(cc pb.ConfChange) *pb.ConfState {
+func (n *node) ApplyConfChange(ccer pb.ConfChangeV2er) *pb.ConfState {
+	cc := ccer.AsConfChangeV2()
 	var cs pb.ConfState
 	select {
 	case n.confc <- cc:

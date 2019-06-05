@@ -14,8 +14,14 @@
 
 package raftpb
 
+// ConfChangeV2er is a message that is equivalent to a ConfChangeV2. In
+// practice, these messages are either a ConfChangeV2 or a (legacy) ConfChange.
+type ConfChangeV2er interface {
+	AsConfChangeV2() ConfChangeV2
+}
+
 // AsV2 returns a V2 configuration change carrying out the same operation.
-func (cc *ConfChange) AsV2() ConfChangeV2 {
+func (cc ConfChange) AsConfChangeV2() ConfChangeV2 {
 	return ConfChangeV2{
 		Changes: []ConfChangeSimple{{
 			ID:     cc.ID,
