@@ -233,7 +233,7 @@ func StartNode(c *Config, peers []Peer) Node {
 	// We do not set raftLog.applied so the application will be able
 	// to observe all conf changes via Ready.CommittedEntries.
 	for _, peer := range peers {
-		r.addNode(peer.ID)
+		r.addNode(peer.ID, false /* joint */)
 	}
 
 	n := newNode()

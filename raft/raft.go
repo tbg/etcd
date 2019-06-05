@@ -327,6 +327,7 @@ func newRaft(c *Config) *raft {
 	}
 	peers := c.peers
 	learners := c.learners
+	var peersJoint []uint64
 	if len(cs.Nodes) > 0 || len(cs.Learners) > 0 {
 		if len(peers) > 0 || len(learners) > 0 {
 			// TODO(bdarnell): the peers argument is always nil except in
@@ -336,6 +337,7 @@ func newRaft(c *Config) *raft {
 		}
 		peers = cs.Nodes
 		learners = cs.Learners
+		peersJoint = cs.NodesJoint
 	}
 	r := &raft{
 		id:                        c.ID,
@@ -355,15 +357,19 @@ func newRaft(c *Config) *raft {
 	}
 	for _, p := range peers {
 		// Add node to active config.
-		r.prs.initProgress(p, 0 /* match */, 1 /* next */, false /* isLearner */)
+		r.prs.initProgress(p, 0 /* match */, 1 /* next */, addNodeVoter)
 	}
 	for _, p := range learners {
 		// Add learner to active config.
-		r.prs.initProgress(p, 0 /* match */, 1 /* next */, true /* isLearner */)
+		r.prs.initProgress(p, 0 /* match */, 1 /* next */, addNodeLearner)
 
 		if r.id == p {
 			r.isLearner = true
 		}
+	}
+	for _, p := range peersJoint {
+		// TODO(tbg) why wouldn't all of these call r.restore?
+		r.prs.initProgress(p, 0 /* match */, 1 /* next */, addNodeJointVoter)
 	}
 
 	if !isHardStateEqual(hs, emptyState) {
@@ -1331,35 +1337,59 @@ func (r *raft) restore(s pb.Snapshot) bool {
 
 	r.raftLog.restore(s)
 	r.prs = makeProgressTracker(r.prs.maxInflight)
-	r.restoreNode(s.Metadata.ConfState.Nodes, false)
-	r.restoreNode(s.Metadata.ConfState.Learners, true)
+	r.restoreNode(s.Metadata.ConfState.Nodes, addNodeVoter)
+	r.restoreNode(s.Metadata.ConfState.Learners, addNodeLearner)
+	r.restoreNode(s.Metadata.ConfState.NodesJoint, addNodeJointVoter)
 	return true
 }
 
-func (r *raft) restoreNode(nodes []uint64, isLearner bool) {
+func (r *raft) restoreNode(nodes []uint64, typ addNodeType) {
 	for _, n := range nodes {
 		match, next := uint64(0), r.raftLog.lastIndex()+1
 		if n == r.id {
 			match = next - 1
-			r.isLearner = isLearner
+			r.isLearner = typ == addNodeLearner
 		}
-		r.prs.initProgress(n, match, next, isLearner)
+		r.prs.initProgress(n, match, next, typ)
 		r.logger.Infof("%x restored progress of %x [%s]", r.id, n, r.prs.getProgress(n))
 	}
 }
 
 func (r *raft) applyConfChange(ccc pb.ConfChangeV2) pb.ConfState {
+	if len(r.prs.voters[1]) > 0 {
+		if len(ccc.Changes) != 0 {
+			// When we're in a joint configuration, don't accept any config
+			// change except the zero one (which transitions out of the joint
+			// config).
+			// TODO(tbg): log warning
+			return r.prs.confState()
+		}
+		for id := range r.prs.voters[0] {
+			r.prs.removeAny(id, false /* joint */)
+		}
+	}
+
+	// We're activating a simple config change or entering a joint consensus
+	// configuration.
+	joint := ccc.JointConsensus()
+	if joint {
+		// We already know that voters[1] is zero. Initialize it with a copy of
+		// voters[0] and then apply the voter mutations to it.
+		for id := range r.prs.voters[0] {
+			r.prs.voters[1][id] = struct{}{}
+		}
+	}
 	for _, cc := range ccc.Changes {
 		if cc.NodeID == None {
 			continue
 		}
 		switch cc.Type {
 		case pb.ConfChangeAddNode:
-			r.addNode(cc.NodeID)
+			r.addNode(cc.NodeID, joint)
+		case pb.ConfChangeRemoveNode:
+			r.removeNode(cc.NodeID, joint)
 		case pb.ConfChangeAddLearnerNode:
 			r.addLearner(cc.NodeID)
-		case pb.ConfChangeRemoveNode:
-			r.removeNode(cc.NodeID)
 		case pb.ConfChangeUpdateNode:
 		default:
 			panic("unexpected conf type")
@@ -1380,21 +1410,35 @@ func (r *raft) promotable() bool {
 	return pr != nil && !pr.IsLearner
 }
 
-func (r *raft) addNode(id uint64) {
-	r.addNodeOrLearnerNode(id, false)
+func (r *raft) addNode(id uint64, joint bool) {
+	typ := addNodeVoter
+	if joint {
+		typ = addNodeJointVoter
+	}
+	r.addNodeOrLearnerNode(id, typ)
 }
 
 func (r *raft) addLearner(id uint64) {
-	r.addNodeOrLearnerNode(id, true)
+	r.addNodeOrLearnerNode(id, addNodeLearner)
 }
 
-func (r *raft) addNodeOrLearnerNode(id uint64, isLearner bool) {
+type addNodeType int
+
+const (
+	addNodeVoter      addNodeType = iota
+	addNodeJointVoter addNodeType = iota
+	addNodeLearner
+)
+
+func (r *raft) addNodeOrLearnerNode(id uint64, typ addNodeType) {
+	isLearner := typ == addNodeLearner
 	pr := r.prs.getProgress(id)
 	if pr == nil {
-		r.prs.initProgress(id, 0, r.raftLog.lastIndex()+1, isLearner)
+		r.prs.initProgress(id, 0, r.raftLog.lastIndex()+1, typ)
 	} else {
 		if isLearner && !pr.IsLearner {
 			// Can only change Learner to Voter.
+			panic("x") // why is this not an allowed operation?
 			r.logger.Infof("%x ignored addLearner: do not support changing %x from raft peer to learner.", r.id, id)
 			return
 		}
@@ -1406,8 +1450,11 @@ func (r *raft) addNodeOrLearnerNode(id uint64, isLearner bool) {
 		}
 
 		// Change Learner to Voter, use origin Learner progress.
-		r.prs.removeAny(id)
-		r.prs.initProgress(id, 0 /* match */, 1 /* next */, false /* isLearner */)
+		//
+		// TODO(tbg): the false doesn't matter but should really specify that
+		// we're aiming at a learner.
+		r.prs.removeAny(id, false)
+		r.prs.initProgress(id, 0 /* match */, 1 /* next */, addNodeVoter)
 		pr.IsLearner = false
 		*r.prs.getProgress(id) = *pr
 	}
@@ -1422,11 +1469,13 @@ func (r *raft) addNodeOrLearnerNode(id uint64, isLearner bool) {
 	r.prs.getProgress(id).RecentActive = true
 }
 
-func (r *raft) removeNode(id uint64) {
-	r.prs.removeAny(id)
+func (r *raft) removeNode(id uint64, joint bool) {
+	// Ugh here it gets messy, basically we're better off seeding the joint config
+	// with a copy and then applying all of the stuff. Or maybe not?
+	r.prs.removeAny(id, joint)
 
 	// Do not try to commit or abort transferring if the cluster is now empty.
-	if len(r.prs.voters[0]) == 0 && len(r.prs.learners) == 0 {
+	if len(r.prs.voters[0]) == 0 && len(r.prs.voters[1]) == 0 && len(r.prs.learners) == 0 {
 		return
 	}
 

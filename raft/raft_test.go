@@ -567,8 +567,8 @@ func TestLearnerPromotion(t *testing.T) {
 
 	nt.send(pb.Message{From: 1, To: 1, Type: pb.MsgBeat})
 
-	n1.addNode(2)
-	n2.addNode(2)
+	n1.addNode(2, false)
+	n2.addNode(2, false)
 	if n2.isLearner {
 		t.Error("peer 2 is learner, want not")
 	}
@@ -1351,9 +1351,9 @@ func TestCommit(t *testing.T) {
 		storage.hardState = pb.HardState{Term: tt.smTerm}
 
 		sm := newTestRaft(1, []uint64{1}, 10, 2, storage)
-		sm.prs.removeAny(1)
+		sm.prs.removeAny(1, false)
 		for j := 0; j < len(tt.matches); j++ {
-			sm.prs.initProgress(uint64(j)+1, tt.matches[j], tt.matches[j]+1, false)
+			sm.prs.initProgress(uint64(j)+1, tt.matches[j], tt.matches[j]+1, addNodeVoter)
 		}
 		sm.maybeCommit()
 		if g := sm.raftLog.committed; g != tt.w {
@@ -2138,7 +2138,7 @@ func TestNonPromotableVoterWithCheckQuorum(t *testing.T) {
 	nt := newNetwork(a, b)
 	setRandomizedElectionTimeout(b, b.electionTimeout+1)
 	// Need to remove 2 again to make it a non-promotable node since newNetwork overwritten some internal states
-	b.prs.removeAny(2)
+	b.prs.removeAny(2, false)
 
 	if b.promotable() {
 		t.Fatalf("promotable = %v, want false", b.promotable())
@@ -3287,7 +3287,7 @@ func TestNewLeaderPendingConfig(t *testing.T) {
 // TestAddNode tests that addNode could update nodes correctly.
 func TestAddNode(t *testing.T) {
 	r := newTestRaft(1, []uint64{1}, 10, 1, NewMemoryStorage())
-	r.addNode(2)
+	r.addNode(2, false)
 	nodes := r.prs.voterNodes()
 	wnodes := []uint64{1, 2}
 	if !reflect.DeepEqual(nodes, wnodes) {
@@ -3322,7 +3322,7 @@ func TestAddNodeCheckQuorum(t *testing.T) {
 		r.tick()
 	}
 
-	r.addNode(2)
+	r.addNode(2, false)
 
 	// This tick will reach electionTimeout, which triggers a quorum check.
 	r.tick()
@@ -3347,14 +3347,14 @@ func TestAddNodeCheckQuorum(t *testing.T) {
 // and removed list correctly.
 func TestRemoveNode(t *testing.T) {
 	r := newTestRaft(1, []uint64{1, 2}, 10, 1, NewMemoryStorage())
-	r.removeNode(2)
+	r.removeNode(2, false)
 	w := []uint64{1}
 	if g := r.prs.voterNodes(); !reflect.DeepEqual(g, w) {
 		t.Errorf("nodes = %v, want %v", g, w)
 	}
 
 	// remove all nodes from cluster
-	r.removeNode(1)
+	r.removeNode(1, false)
 	w = []uint64{}
 	if g := r.prs.voterNodes(); !reflect.DeepEqual(g, w) {
 		t.Errorf("nodes = %v, want %v", g, w)
@@ -3365,7 +3365,7 @@ func TestRemoveNode(t *testing.T) {
 // and removed list correctly.
 func TestRemoveLearner(t *testing.T) {
 	r := newTestLearnerRaft(1, []uint64{1}, []uint64{2}, 10, 1, NewMemoryStorage())
-	r.removeNode(2)
+	r.removeNode(2, false)
 	w := []uint64{1}
 	if g := r.prs.voterNodes(); !reflect.DeepEqual(g, w) {
 		t.Errorf("nodes = %v, want %v", g, w)
@@ -3377,7 +3377,7 @@ func TestRemoveLearner(t *testing.T) {
 	}
 
 	// remove all nodes from cluster
-	r.removeNode(1)
+	r.removeNode(1, false)
 	if g := r.prs.voterNodes(); !reflect.DeepEqual(g, w) {
 		t.Errorf("nodes = %v, want %v", g, w)
 	}
@@ -3511,7 +3511,7 @@ func TestCommitAfterRemoveNode(t *testing.T) {
 
 	// Apply the config change. This reduces quorum requirements so the
 	// pending command can now commit.
-	r.removeNode(2)
+	r.removeNode(2, false)
 	ents = nextEnts(r, s)
 	if len(ents) != 1 || ents[0].Type != pb.EntryNormal ||
 		string(ents[0].Data) != "hello" {
@@ -3760,7 +3760,7 @@ func TestLeaderTransferRemoveNode(t *testing.T) {
 		t.Fatalf("wait transferring, leadTransferee = %v, want %v", lead.leadTransferee, 3)
 	}
 
-	lead.removeNode(3)
+	lead.removeNode(3, false)
 
 	checkLeaderTransferState(t, lead, StateLeader, 1)
 }

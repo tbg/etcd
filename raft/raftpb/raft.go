@@ -66,7 +66,7 @@ func (cc *ConfChangeV2) JointConsensus() bool {
 		switch c.Type {
 		case ConfChangeAddNode, ConfChangeRemoveNode:
 			if changed {
-				return false
+				return true
 			}
 			changed = true
 		case ConfChangeAddLearnerNode, ConfChangeUpdateNode:
@@ -74,5 +74,5 @@ func (cc *ConfChangeV2) JointConsensus() bool {
 			panic(fmt.Sprintf("unknown config change type in %+v", cc))
 		}
 	}
-	return true
+	return false
 }

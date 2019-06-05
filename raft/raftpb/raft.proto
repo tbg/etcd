@@ -84,6 +84,7 @@ message ConfState {
     // Pulling out the learners doesn't quite work. When we switch out of the
     // joint configuration, we have to remember which learners to keep and we
     // won't have the delta available any more...
+	// TODO(tbg): rename this to voters_joint and the above to voters?
 	repeated uint64 nodes_joint    = 3;
 }
 

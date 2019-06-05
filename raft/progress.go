@@ -19,6 +19,7 @@ import (
 	"sort"
 
 	"go.etcd.io/etcd/raft/quorum"
+	"go.etcd.io/etcd/raft/raftpb"
 )
 
 const (
@@ -322,6 +323,14 @@ func makeProgressTracker(maxInflight int) progressTracker {
 	return p
 }
 
+func (p *progressTracker) confState() raftpb.ConfState {
+	return raftpb.ConfState{
+		Nodes:      p.voters[0].Slice(),
+		Learners:   p.learners.Slice(),
+		NodesJoint: p.voters[1].Slice(),
+	}
+}
+
 // isSingleton returns true if (and only if) there is only one voting member
 // (i.e. the leader) in the current configuration.
 func (p *progressTracker) isSingleton() bool {
@@ -346,40 +355,71 @@ func (p *progressTracker) committed() uint64 {
 	return p.voters.CommittedIndex(matchLookuper(p.prs)).Definitely
 }
 
-func (p *progressTracker) removeAny(id uint64) {
-	_, okPR := p.prs[id]
-	_, okV1 := p.voters[0][id]
-	_, okV2 := p.voters[1][id]
-	_, okL := p.learners[id]
+func (p *progressTracker) prRefcount(id uint64) int {
+	var n int
+	for _, m := range []map[uint64]struct{}{
+		p.voters[0],
+		p.voters[1],
+		p.learners,
+	} {
+		if _, ok := m[id]; ok {
+			n++
+		}
+	}
+	return n
+}
 
-	okV := okV1 || okV2
+func (p *progressTracker) assertInvariants() {
+	// TODO(tbg)
+	// - voters and learners is disjoint
+	// no noop removals
+}
 
-	if !okPR {
-		panic("attempting to remove unknown peer %x")
-	} else if !okV && !okL {
-		panic("attempting to remove unknown peer %x")
-	} else if okV && okL {
-		panic(fmt.Sprintf("peer %x is both voter and learner", id))
+func (p *progressTracker) removeAny(id uint64, joint bool) {
+	p.assertInvariants()
+	n := p.prRefcount(id)
+	if n == 0 {
+		panic("peer not found")
+	}
+	if !joint {
+		delete(p.voters[0], id)
+	} else {
+		delete(p.voters[1], id)
+	}
+	delete(p.learners, id)
+	if p.prRefcount(id)+2 <= n {
+		panic("peer was both voter and learner")
+	}
+	if n := p.prRefcount(id); n == 0 {
+		delete(p.prs, id)
 	}
 
-	delete(p.voters[0], id)
-	delete(p.voters[1], id)
-	delete(p.learners, id)
-	delete(p.prs, id)
 }
 
 // initProgress initializes a new progress for the given node or learner. The
 // node may not exist yet in either form or a panic will ensue.
-func (p *progressTracker) initProgress(id, match, next uint64, isLearner bool) {
+func (p *progressTracker) initProgress(id, match, next uint64, typ addNodeType) {
 	if pr := p.prs[id]; pr != nil {
-		panic(fmt.Sprintf("peer %x already tracked as node %v", id, pr))
+		// TODO(tbg): assert that typ is compatible with what's currently ref'ing
+		// the Progress.
+		return
 	}
-	if !isLearner {
+	switch typ {
+	case addNodeVoter:
 		p.voters[0][id] = struct{}{}
-	} else {
+	case addNodeJointVoter:
+		p.voters[1][id] = struct{}{}
+	case addNodeLearner:
 		p.learners[id] = struct{}{}
+	default:
+		panic(fmt.Sprintf("unknown addNodeType %v", typ))
 	}
-	p.prs[id] = &Progress{Next: next, Match: match, ins: newInflights(p.maxInflight), IsLearner: isLearner}
+	p.prs[id] = &Progress{
+		Next:      next,
+		Match:     match,
+		ins:       newInflights(p.maxInflight),
+		IsLearner: typ == addNodeLearner,
+	}
 }
 
 func (p *progressTracker) getProgress(id uint64) *Progress {

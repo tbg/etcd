@@ -101,7 +101,8 @@ func NewRawNode(config *Config, peers []Peer) (*RawNode, error) {
 		r.raftLog.append(ents...)
 		r.raftLog.committed = uint64(len(ents))
 		for _, peer := range peers {
-			r.addNode(peer.ID)
+			// TODO(tbg): this should take a typ and addLearner should go away.
+			r.addNode(peer.ID, false /* joint */)
 		}
 	}
 
