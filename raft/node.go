@@ -470,13 +470,14 @@ func (n *node) Step(ctx context.Context, m pb.Message) error {
 }
 
 func confChangeToMsg(ccer pb.ConfChangeV2er) (pb.Message, error) {
-	if lcc, legacy := ccer.(*pb.ConfChange); legacy {
+	if lcc, legacy := ccer.V1(); legacy {
 		data, err := lcc.Marshal()
 		if err != nil {
 			return pb.Message{}, err
 		}
 		return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChange, Data: data}}}, nil
 	}
+	panic("nope")
 	cc := ccer.AsConfChangeV2()
 	data, err := cc.Marshal()
 	if err != nil {

@@ -20,6 +20,7 @@ import "fmt"
 // practice, these messages are either a ConfChangeV2 or a (legacy) ConfChange.
 type ConfChangeV2er interface {
 	AsConfChangeV2() ConfChangeV2
+	V1() (ConfChange, bool)
 }
 
 // AsConfChangeV2 returns a V2 configuration change carrying out the same operation.
@@ -35,9 +36,17 @@ func (cc ConfChange) AsConfChangeV2() ConfChangeV2 {
 	}
 }
 
+// V1 returns the ConfChange and true.
+func (cc ConfChange) V1() (ConfChange, bool) {
+	return cc, true
+}
+
 // AsConfChangeV2 is the identity.
 // This implements ConfChangeV2er.
 func (cc ConfChangeV2) AsConfChangeV2() ConfChangeV2 { return cc }
+
+// V1 returns ConfChange{} and false.
+func (cc ConfChangeV2) V1() (ConfChange, bool) { return ConfChange{}, false }
 
 // JointConsensus returns true if the configuration change will use Joint
 // Consensus, which is the case if it contains more than more than one
