@@ -748,7 +748,7 @@ func (r *raft) campaign(t CampaignType) {
 		}
 		return
 	}
-	for id := range r.prs.voters.IDs() {
+	for id := range r.prs.voters.Union() {
 		if id == r.id {
 			continue
 		}
@@ -1345,6 +1345,31 @@ func (r *raft) restoreNode(nodes []uint64, isLearner bool) {
 		}
 		r.prs.initProgress(n, match, next, isLearner)
 		r.logger.Infof("%x restored progress of %x [%s]", r.id, n, r.prs.getProgress(n))
+	}
+}
+
+func (r *raft) applyConfChange(ccc pb.ConfChangeV2) pb.ConfState {
+	for _, cc := range ccc.Changes {
+		if cc.NodeID == None {
+			continue
+		}
+		switch cc.Type {
+		case pb.ConfChangeAddNode:
+			r.addNode(cc.NodeID)
+		case pb.ConfChangeAddLearnerNode:
+			r.addLearner(cc.NodeID)
+		case pb.ConfChangeRemoveNode:
+			r.removeNode(cc.NodeID)
+		case pb.ConfChangeUpdateNode:
+		default:
+			panic("unexpected conf type")
+		}
+	}
+
+	return pb.ConfState{
+		Nodes:      r.prs.voters[0].Slice(),
+		Learners:   r.prs.learners.Slice(),
+		NodesJoint: r.prs.voters[1].Slice(),
 	}
 }
 

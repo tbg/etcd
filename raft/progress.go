@@ -289,12 +289,18 @@ func (in *inflights) reset() {
 	in.start = 0
 }
 
+type learnersMap map[uint64]struct{}
+
+func (m learnersMap) Slice() []uint64 {
+	return quorum.MajorityConfig(m).Slice()
+}
+
 // progressTracker tracks the currently active configuration and the information
 // known about the nodes and learners in it. In particular, it tracks the match
 // index for each peer which in turn allows reasoning about the committed index.
 type progressTracker struct {
 	voters   quorum.JointConfig
-	learners map[uint64]struct{}
+	learners learnersMap
 	prs      map[uint64]*Progress
 
 	votes map[uint64]bool
@@ -402,12 +408,11 @@ func (p *progressTracker) quorumActive() bool {
 	return p.voters.VoteResult(votes) == quorum.VoteWon
 }
 
+// TODO(tbg): audit all callers to see if any of them ought to look at the
+// parts of the joint quorum individually.
 func (p *progressTracker) voterNodes() []uint64 {
-	m := p.voters.IDs()
-	nodes := make([]uint64, 0, len(m))
-	for id := range m {
-		nodes = append(nodes, id)
-	}
+	sl1, sl2 := p.voters[0].Slice(), p.voters[1].Slice()
+	nodes := append(sl1, sl2...)
 	sort.Sort(uint64Slice(nodes))
 	return nodes
 }

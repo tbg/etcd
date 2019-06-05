@@ -366,36 +366,20 @@ func (n *node) run(r *raft) {
 			}
 		case ccc := <-n.confc:
 			// TODO(tbg): actually handle more than the first change.
-			cc := ccc.Changes[0]
-			if cc.NodeID == None {
-				select {
-				case n.confstatec <- pb.ConfState{
-					Nodes:    r.prs.voterNodes(),
-					Learners: r.prs.learnerNodes()}:
-				case <-n.done:
-				}
-				break
-			}
-			switch cc.Type {
-			case pb.ConfChangeAddNode:
-				r.addNode(cc.NodeID)
-			case pb.ConfChangeAddLearnerNode:
-				r.addLearner(cc.NodeID)
-			case pb.ConfChangeRemoveNode:
-				// block incoming proposal when local node is
-				// removed
-				if cc.NodeID == r.id {
+			for _, cc := range ccc.Changes {
+				if cc.Type == pb.ConfChangeRemoveNode && cc.NodeID == r.id {
+					// block incoming proposal when local node is
+					// removed
+					//
+					// TODO(tbg): a joint consensus conf change could remove and
+					// immediately re-add the node. Double check that this
+					// behavior below is fine in that case.
 					propc = nil
 				}
-				r.removeNode(cc.NodeID)
-			case pb.ConfChangeUpdateNode:
-			default:
-				panic("unexpected conf type")
 			}
+			cs := r.applyConfChange(ccc)
 			select {
-			case n.confstatec <- pb.ConfState{
-				Nodes:    r.prs.voterNodes(),
-				Learners: r.prs.learnerNodes()}:
+			case n.confstatec <- cs:
 			case <-n.done:
 			}
 		case <-n.tickc:
@@ -477,7 +461,6 @@ func confChangeToMsg(ccer pb.ConfChangeV2er) (pb.Message, error) {
 		}
 		return pb.Message{Type: pb.MsgProp, Entries: []pb.Entry{{Type: pb.EntryConfChange, Data: data}}}, nil
 	}
-	panic("nope")
 	cc := ccer.AsConfChangeV2()
 	data, err := cc.Marshal()
 	if err != nil {

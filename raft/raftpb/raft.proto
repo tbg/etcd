@@ -81,8 +81,10 @@ message HardState {
 message ConfState {
 	repeated uint64 nodes          = 1;
 	repeated uint64 learners       = 2;
+    // Pulling out the learners doesn't quite work. When we switch out of the
+    // joint configuration, we have to remember which learners to keep and we
+    // won't have the delta available any more...
 	repeated uint64 nodes_joint    = 3;
-	repeated uint64 learners_joint = 4;
 }
 
 enum ConfChangeType {

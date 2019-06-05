@@ -160,24 +160,9 @@ func (rn *RawNode) ProposeConfChange(ccer pb.ConfChangeV2er) error {
 }
 
 // ApplyConfChange applies a config change to the local node.
-func (rn *RawNode) ApplyConfChange(ccc pb.ConfChangeV2er) *pb.ConfState {
-	// TODO(tbg): actually handle V2 properly.
-	cc := ccc.AsConfChangeV2().Changes[0]
-	if cc.NodeID == None {
-		return &pb.ConfState{Nodes: rn.raft.prs.voterNodes(), Learners: rn.raft.prs.learnerNodes()}
-	}
-	switch cc.Type {
-	case pb.ConfChangeAddNode:
-		rn.raft.addNode(cc.NodeID)
-	case pb.ConfChangeAddLearnerNode:
-		rn.raft.addLearner(cc.NodeID)
-	case pb.ConfChangeRemoveNode:
-		rn.raft.removeNode(cc.NodeID)
-	case pb.ConfChangeUpdateNode:
-	default:
-		panic("unexpected conf type")
-	}
-	return &pb.ConfState{Nodes: rn.raft.prs.voterNodes(), Learners: rn.raft.prs.learnerNodes()}
+func (rn *RawNode) ApplyConfChange(ccer pb.ConfChangeV2er) *pb.ConfState {
+	cs := rn.raft.applyConfChange(ccer.AsConfChangeV2())
+	return &cs
 }
 
 // Step advances the state machine using the given message.

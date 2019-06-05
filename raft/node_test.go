@@ -345,6 +345,23 @@ func TestNodeProposeConfig(t *testing.T) {
 // TestNodeProposeAddDuplicateNode ensures that two proposes to add the same node should
 // not affect the later propose to add new node.
 func TestNodeProposeAddDuplicateNode(t *testing.T) {
+	for _, transition := range []raftpb.ConfChangeTransition{
+		-1,
+		raftpb.ConfChangeTransitionAuto,
+		raftpb.ConfChangeTransitionJointImplicit,
+		raftpb.ConfChangeTransitionJointExplicit,
+	} {
+		name := "v1"
+		if transition != -1 {
+			name = transition.String()
+		}
+		t.Run(name, func(t *testing.T) {
+			testNodeProposeAddDuplicateNodeImpl(t, transition)
+		})
+	}
+}
+
+func testNodeProposeAddDuplicateNodeImpl(t *testing.T, transition raftpb.ConfChangeTransition) {
 	n := newNode()
 	s := NewMemoryStorage()
 	r := newTestRaft(1, []uint64{1}, 10, 1, s)
@@ -370,12 +387,26 @@ func TestNodeProposeAddDuplicateNode(t *testing.T) {
 				applied := false
 				for _, e := range rd.Entries {
 					rdyEntries = append(rdyEntries, e)
+					var ccer raftpb.ConfChangeV2er
 					switch e.Type {
 					case raftpb.EntryNormal:
 					case raftpb.EntryConfChange:
 						var cc raftpb.ConfChange
-						cc.Unmarshal(e.Data)
-						n.ApplyConfChange(cc)
+						_ = cc.Unmarshal(e.Data)
+						if transition != -1 {
+							t.Errorf("unexpectedly saw v1 conf change %+v", cc)
+						}
+						ccer = cc
+					case raftpb.EntryConfChangeV2:
+						var cc raftpb.ConfChangeV2
+						_ = cc.Unmarshal(e.Data)
+						if transition == -1 {
+							t.Errorf("unexpectedly saw v2 conf change %+v", cc)
+						}
+						ccer = cc
+					}
+					if ccer != nil {
+						n.ApplyConfChange(ccer)
 						applied = true
 					}
 				}
@@ -387,8 +418,19 @@ func TestNodeProposeAddDuplicateNode(t *testing.T) {
 		}
 	}()
 
-	cc1 := raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 1}
-	ccdata1, _ := cc1.Marshal()
+	makeSimpleConfChange := func(transition raftpb.ConfChangeTransition, cc raftpb.ConfChange) (raftpb.ConfChangeV2er, []byte) {
+		if transition == -1 {
+			b, _ := cc.Marshal()
+			return cc, b
+		}
+		c2 := cc.AsConfChangeV2()
+		c2.Transition = transition
+		b, _ := c2.Marshal()
+		return c2, b
+	}
+
+	cc1, ccdata1 := makeSimpleConfChange(transition, raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 1})
+
 	n.ProposeConfChange(context.TODO(), cc1)
 	<-applyConfChan
 
@@ -397,8 +439,7 @@ func TestNodeProposeAddDuplicateNode(t *testing.T) {
 	<-applyConfChan
 
 	// the new node join should be ok
-	cc2 := raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 2}
-	ccdata2, _ := cc2.Marshal()
+	cc2, ccdata2 := makeSimpleConfChange(transition, raftpb.ConfChange{Type: raftpb.ConfChangeAddNode, NodeID: 2})
 	n.ProposeConfChange(context.TODO(), cc2)
 	<-applyConfChan
 
