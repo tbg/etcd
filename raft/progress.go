@@ -332,7 +332,8 @@ func (p *progressTracker) confState() raftpb.ConfState {
 }
 
 // isSingleton returns true if (and only if) there is only one voting member
-// (i.e. the leader) in the current configuration.
+// (i.e. the leader) in the current configuration. It returns false for any
+// joint configuration, even when both halves are the same singleton config.
 func (p *progressTracker) isSingleton() bool {
 	return len(p.voters[0]) == 1 && len(p.voters[1]) == 0
 }

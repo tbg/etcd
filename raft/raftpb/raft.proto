@@ -86,6 +86,7 @@ message ConfState {
     // won't have the delta available any more...
 	// TODO(tbg): rename this to voters_joint and the above to voters?
 	repeated uint64 nodes_joint    = 3;
+	optional transition transition = 4;
 }
 
 enum ConfChangeType {
