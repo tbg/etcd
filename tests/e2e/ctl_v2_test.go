@@ -533,7 +533,7 @@ func setupEtcdctlTest(t *testing.T, cfg *etcdProcessClusterConfig, quorum bool) 
 	}
 	epc, err := newEtcdProcessCluster(cfg)
 	if err != nil {
-		t.Fatalf("could not start etcd process cluster (%v)", err)
+		t.Fatalf("TBG could not start etcd process cluster (%v)", err)
 	}
 	return epc
 }
