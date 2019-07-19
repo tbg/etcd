@@ -17,6 +17,7 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 
 	"go.etcd.io/etcd/pkg/expect"
@@ -29,5 +30,9 @@ func spawnCmd(args []string) (*expect.ExpectProcess, error) {
 		env := append(os.Environ(), "ETCDCTL_API=3")
 		return expect.NewExpectWithEnv(ctlBinPath, args[1:], env)
 	}
-	return expect.NewExpect(args[0], args[1:]...)
+	p, err := expect.NewExpect(args[0], args[1:]...)
+	if err != nil {
+		return nil, fmt.Errorf("%v: %s", args, err)
+	}
+	return p, err
 }
