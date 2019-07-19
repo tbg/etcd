@@ -3,7 +3,6 @@
 package pty
 
 import (
-	"io"
 	"os"
 	"os/exec"
 	"syscall"
@@ -21,12 +20,6 @@ func Start(c *exec.Cmd) (pty *os.File, err error) {
 	c.Stdout = tty
 	c.Stdin = tty
 	c.Stderr = tty
-
-	so := io.MultiWriter(os.Stdout, tty)
-	se := io.MultiWriter(os.Stderr, tty)
-	c.Stdout = so
-	c.Stderr = se
-
 	if c.SysProcAttr == nil {
 		c.SysProcAttr = &syscall.SysProcAttr{}
 	}
