@@ -88,13 +88,14 @@ func (ep *etcdServerProcess) Start() error {
 	if ep.proc != nil {
 		panic("already started")
 	}
-	proc, err := spawnCmd(append([]string{ep.cfg.execPath}, ep.cfg.args...))
+	args := append([]string{ep.cfg.execPath}, ep.cfg.args...)
+	proc, err := spawnCmd(args)
 	if err != nil {
 		return err
 	}
 	ep.proc = proc
 	if err := ep.waitReady(); err != nil {
-		return fmt.Errorf("waitReady %v", err)
+		return fmt.Errorf("waitReady %v: %v", args, err)
 	}
 	return nil
 }
