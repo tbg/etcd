@@ -93,7 +93,10 @@ func (ep *etcdServerProcess) Start() error {
 		return err
 	}
 	ep.proc = proc
-	return ep.waitReady()
+	if err := ep.waitReady(); err != nil {
+		return fmt.Errorf("waitReady %v", err)
+	}
+	return nil
 }
 
 func (ep *etcdServerProcess) Restart() error {

@@ -32,11 +32,11 @@ func spawnCmd(args []string) (*expect.ExpectProcess, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%v: %s", args, err)
 		}
-		return p, err
+		return p, nil
 	}
 	p, err := expect.NewExpect(args[0], args[1:]...)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %s", args, err)
 	}
-	return p, err
+	return p, nil
 }
