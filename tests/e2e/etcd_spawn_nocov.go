@@ -28,7 +28,11 @@ const noOutputLineCount = 0 // regular binaries emit no extra lines
 func spawnCmd(args []string) (*expect.ExpectProcess, error) {
 	if args[0] == ctlBinPath+"3" {
 		env := append(os.Environ(), "ETCDCTL_API=3")
-		return expect.NewExpectWithEnv(ctlBinPath, args[1:], env)
+		p, err := expect.NewExpectWithEnv(ctlBinPath, args[1:], env)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %s", args, err)
+		}
+		return p, err
 	}
 	p, err := expect.NewExpect(args[0], args[1:]...)
 	if err != nil {

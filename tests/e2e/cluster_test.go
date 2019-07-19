@@ -83,7 +83,7 @@ var (
 		clientTLS:             clientTLS,
 		initialToken:          "new",
 		clientCertAuthEnabled: true,
-		noCN:                  true,
+		noCN: true,
 	}
 	configJWT = etcdProcessClusterConfig{
 		clusterSize:   1,
@@ -149,13 +149,13 @@ func newEtcdProcessCluster(cfg *etcdProcessClusterConfig) (*etcdProcessCluster, 
 		proc, err := newEtcdProcess(etcdCfgs[i])
 		if err != nil {
 			epc.Close()
-			return nil, err
+			return nil, fmt.Errorf("newProcess %v", err)
 		}
 		epc.procs[i] = proc
 	}
 
 	if err := epc.Start(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("start %v", err)
 	}
 	return epc, nil
 }
