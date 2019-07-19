@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 )
 
 // Start assigns a pseudo-terminal tty os.File to c.Stdin, c.Stdout,
@@ -17,7 +18,10 @@ func Start(c *exec.Cmd) (pty *os.File, err error) {
 	if err != nil {
 		return nil, err
 	}
-	//defer tty.Close()
+	go func() {
+		<-time.After(10 * time.Second)
+		tty.Close()
+	}()
 	so := io.MultiWriter(tty, os.Stdout)
 	se := io.MultiWriter(tty, os.Stderr)
 	c.Stdout = so
